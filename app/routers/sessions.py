@@ -10,12 +10,16 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 @router.post("/", response_model=SessionIn)
 async def create_session(session: SessionIn, current_user=Depends(dependencies.get_current_active_user)):
-    # only staff/academy-admin/admin may create, and must be in same academy
-    if not has_any_role(current_user.role, ["admin", "academy_admin", "academyAdmin", "staff"]):
-        raise HTTPException(status_code=403, detail="Insufficient privileges")
     student = await auth.get_user(session.student)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    if has_any_role(current_user.role, ["student"]):
+        if current_user.username != session.student:
+            raise HTTPException(status_code=403, detail="Students can only save their own sessions")
+    elif not has_any_role(current_user.role, ["admin", "academy_admin", "academyAdmin", "staff"]):
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
+
     if has_any_role(current_user.role, ["academy_admin", "academyAdmin", "staff"]) and current_user.academy_id != student.academy_id:
         raise HTTPException(status_code=403, detail="Cannot create session outside academy")
     now_ts = datetime.utcnow().timestamp()

@@ -184,7 +184,10 @@ async def verify_payment(payload: CheckoutVerifyIn):
         raise HTTPException(status_code=400, detail="Organization name is required for organization plans.")
     if not payload.email:
         raise HTTPException(status_code=400, detail="Email is required for plan activation.")
-    if EMAIL_VERIFICATION_REQUIRED and not await is_signup_email_verified(payload.email):
+    signup_email_verified = True
+    if EMAIL_VERIFICATION_REQUIRED:
+        signup_email_verified = await is_signup_email_verified(payload.email)
+    if EMAIL_VERIFICATION_REQUIRED and not signup_email_verified:
         raise HTTPException(status_code=403, detail="Email verification required before checkout.")
 
     existing_user = await db.users.find_one({"username": payload.username})
@@ -237,7 +240,7 @@ async def verify_payment(payload: CheckoutVerifyIn):
             }
         )
 
-    email_verified = False if payload.email else True
+    email_verified = True if payload.email and signup_email_verified else (False if payload.email else True)
     user_doc = {
         "username": payload.username,
         "hashed_password": get_password_hash(payload.password),

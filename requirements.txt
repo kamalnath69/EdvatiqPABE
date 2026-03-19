@@ -12,3 +12,4 @@ numpy
 pynput
 python-multipart
 razorpay
+openai

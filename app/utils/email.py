@@ -16,6 +16,11 @@ SMTP_TLS = os.getenv("SMTP_TLS", "true").lower() in ("1", "true", "yes")
 EMAIL_ENABLED = os.getenv("EMAIL_ENABLED", "true").lower() in ("1", "true", "yes")
 
 
+def _is_gmail_host(host: str) -> bool:
+    value = (host or "").strip().lower()
+    return "gmail.com" in value or "googlemail.com" in value
+
+
 def _email_shell(title: str, preheader: str, body_html: str, cta_text: str | None = None, cta_url: str | None = None) -> str:
     cta_block = ""
     if cta_text and cta_url:
@@ -68,6 +73,13 @@ def send_email(to_email: str, subject: str, html: str, text: str | None = None) 
         return
     if not SMTP_HOST:
         raise RuntimeError("SMTP_HOST is not configured.")
+    if not SMTP_USER or not SMTP_PASSWORD:
+        raise RuntimeError("SMTP_USER and SMTP_PASSWORD must be configured when EMAIL_ENABLED=true.")
+    if _is_gmail_host(SMTP_HOST) and len(SMTP_PASSWORD.replace(" ", "")) < 16:
+        raise RuntimeError(
+            "Gmail SMTP requires a Google App Password. Set SMTP_USER to your Gmail address and "
+            "SMTP_PASSWORD to a 16-character App Password."
+        )
 
     message = EmailMessage()
     message["From"] = SMTP_FROM
@@ -77,12 +89,19 @@ def send_email(to_email: str, subject: str, html: str, text: str | None = None) 
     message.add_alternative(html, subtype="html")
 
     context = ssl.create_default_context()
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
-        if SMTP_TLS:
-            smtp.starttls(context=context)
-        if SMTP_USER and SMTP_PASSWORD:
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
+            if SMTP_TLS:
+                smtp.starttls(context=context)
             smtp.login(SMTP_USER, SMTP_PASSWORD)
-        smtp.send_message(message)
+            smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError as exc:
+        if _is_gmail_host(SMTP_HOST):
+            raise RuntimeError(
+                "Gmail SMTP authentication failed. Use a Google App Password instead of your normal Gmail password, "
+                "or set EMAIL_ENABLED=false for local development."
+            ) from exc
+        raise RuntimeError("SMTP authentication failed. Check SMTP_USER, SMTP_PASSWORD, and provider settings.") from exc
 
 
 def build_verification_email(code: str, recipient_name: str) -> tuple[str, str, str]:

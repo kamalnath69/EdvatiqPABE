@@ -92,12 +92,14 @@ async def ensure_rules_doc(student, sport: str):
 
 @router.post("/override")
 async def override_rules(username: str, sport: str, rules: dict, current_user=Depends(dependencies.get_current_active_user)):
-    # staff or academy admin for student's academy
-    if not has_any_role(current_user.role, ["admin", "academy_admin", "academyAdmin", "staff"]):
+    current_role = normalize_role(current_user.role)
+    if not has_any_role(current_user.role, ["admin", "academy_admin", "academyAdmin", "staff", "student"]):
         raise HTTPException(status_code=403, detail="Insufficient privileges")
     student = await auth.get_user(username)
     if not student or normalize_role(student.role) != "student":
         raise HTTPException(status_code=404, detail="Student not found")
+    if current_role == "student" and current_user.username != username:
+        raise HTTPException(status_code=403, detail="Students can only modify their own rules")
     if has_any_role(current_user.role, ["academy_admin", "academyAdmin", "staff"]) and current_user.academy_id != student.academy_id:
         raise HTTPException(status_code=403, detail="Cannot modify rules outside academy")
     sport_name = normalize_sport(sport)

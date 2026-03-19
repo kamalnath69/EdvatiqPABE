@@ -21,6 +21,28 @@ POSE_MODEL_PATH=E:\path\to\pose_landmarker_full.task
 If `POSE_MODEL_PATH` is not set, backend will look for `pose_landmarker_full.task`
 under common project paths like `backend/` and `backend/app/`.
 
+## Email verification setup
+
+Verification and password-reset flows use SMTP. Add these environment variables:
+
+```bash
+EMAIL_ENABLED=true
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_TLS=true
+SMTP_USER=your-account@gmail.com
+SMTP_PASSWORD=your-16-char-app-password
+SMTP_FROM=your-account@gmail.com
+SUPPORT_EMAIL=your-account@gmail.com
+APP_URL=http://localhost:5173
+```
+
+Important for Gmail:
+
+- Do not use your normal Gmail password.
+- Use a Google App Password from a Google account with 2-Step Verification enabled.
+- If you are developing locally and do not want email delivery yet, set `EMAIL_ENABLED=false`.
+
 ## Running
 
 ```bash
