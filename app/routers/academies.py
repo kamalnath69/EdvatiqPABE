@@ -7,6 +7,7 @@ from ..utils.auth import get_password_hash
 from ..utils.notifications import send_onboarding_emails
 from ..utils.roles import has_any_role, normalize_role
 from ..utils.default_rules import build_default_rules_map
+from ..utils.workspace import log_workspace_event
 from ..db import db
 
 router = APIRouter(prefix="/academies", tags=["academies"])
@@ -20,6 +21,14 @@ async def create_academy(academy: AcademyIn, current_user=Depends(dependencies.g
         raise HTTPException(status_code=400, detail="Academy id or name already exists")
     doc = {**academy.dict(), "admins": [], "staff": [], "students": []}
     await db.academies.insert_one(doc)
+    await log_workspace_event(
+        current_user,
+        action="academy.created",
+        entity_type="academy",
+        entity_id=academy.academy_id,
+        summary=f"Created academy {academy.name}.",
+        academy_id=academy.academy_id,
+    )
     return academy
 
 @router.get("/", response_model=List[AcademyOut])
@@ -88,6 +97,15 @@ async def add_academy_admin(academy_id: str, user: UserIn, current: UserInDB = D
     }
     await db.users.insert_one(user_doc)
     await db.academies.update_one({"academy_id": academy_id}, {"$push": {"admins": user.username}})
+    await log_workspace_event(
+        current,
+        action="academy_member.created",
+        entity_type="user",
+        entity_id=user.username,
+        summary=f"Added academy admin {user.username}.",
+        target_user=user.username,
+        academy_id=academy_id,
+    )
     try:
         await send_onboarding_emails(user_doc)
     except Exception:
@@ -141,6 +159,15 @@ async def add_staff(
     }
     await db.users.insert_one(user_doc)
     await db.academies.update_one({"academy_id": academy_id}, {"$push": {"staff": user.username}})
+    await log_workspace_event(
+        current,
+        action="academy_member.created",
+        entity_type="user",
+        entity_id=user.username,
+        summary=f"Added staff member {user.username}.",
+        target_user=user.username,
+        academy_id=academy_id,
+    )
     try:
         await send_onboarding_emails(user_doc)
     except Exception:
@@ -200,6 +227,15 @@ async def add_student(
     }
     await db.users.insert_one(user_doc)
     await db.academies.update_one({"academy_id": academy_id}, {"$push": {"students": user.username}})
+    await log_workspace_event(
+        current,
+        action="academy_member.created",
+        entity_type="user",
+        entity_id=user.username,
+        summary=f"Added student {user.username}.",
+        target_user=user.username,
+        academy_id=academy_id,
+    )
     try:
         await send_onboarding_emails(user_doc)
     except Exception:

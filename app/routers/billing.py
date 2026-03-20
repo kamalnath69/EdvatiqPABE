@@ -11,6 +11,8 @@ from ..utils.auth import get_password_hash
 from ..utils.notifications import send_onboarding_emails
 from ..utils.verification import is_signup_email_verified
 from ..utils import dependencies
+from ..utils.roles import normalize_role
+from ..utils.workspace import log_workspace_event
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -134,7 +136,49 @@ async def update_plan_features(
             "ai_analytics": doc["ai_analytics"],
         }
     )
+    await log_workspace_event(
+        current_user,
+        action="billing.plan_features.updated",
+        entity_type="plan",
+        entity_id=plan.code,
+        summary=f"Updated billing plan features for {plan.name}.",
+    )
     return PlanInfo(**data)
+
+
+@router.get("/workspace")
+async def get_billing_workspace(current_user=Depends(dependencies.get_current_active_user)):
+    plans = []
+    for plan in PLANS:
+        features = await _get_plan_features(plan.code)
+        data = plan.dict()
+        data.update(
+            {
+                "description": features.get("description"),
+                "features": features.get("features", []),
+                "ai_chat": features.get("ai_chat", False),
+                "ai_analytics": features.get("ai_analytics", False),
+            }
+        )
+        plans.append(data)
+    if normalize_role(current_user.role) == "admin":
+        payment_query = {}
+    elif getattr(current_user, "org_id", None):
+        payment_query = {"$or": [{"username": current_user.username}, {"org_id": current_user.org_id}]}
+    else:
+        payment_query = {"username": current_user.username}
+    payments = []
+    cursor = db.payments.find(payment_query).sort("created_at", -1)
+    async for item in cursor:
+        item.pop("_id", None)
+        payments.append(item)
+    current_plan = next((plan for plan in plans if plan["code"] == getattr(current_user, "plan_code", None)), None)
+    organization = None
+    if getattr(current_user, "org_id", None):
+        organization = await db.orgs.find_one({"org_id": current_user.org_id})
+        if organization:
+            organization.pop("_id", None)
+    return {"current_plan": current_plan, "available_plans": plans, "payment_history": payments, "organization": organization}
 
 
 @router.post("/create-order")
@@ -260,6 +304,7 @@ async def verify_payment(payload: CheckoutVerifyIn):
     await db.payments.insert_one(
         {
             "username": payload.username,
+            "org_id": org_id,
             "plan_code": plan.code,
             "plan_type": plan.plan_type,
             "plan_tier": plan.tier,
@@ -267,6 +312,16 @@ async def verify_payment(payload: CheckoutVerifyIn):
             "razorpay_payment_id": payload.razorpay_payment_id,
             "created_at": datetime.utcnow().timestamp(),
         }
+    )
+    await log_workspace_event(
+        None,
+        action="billing.subscription.activated",
+        entity_type="subscription",
+        entity_id=payload.username,
+        summary=f"Activated {plan.code} for {payload.username}.",
+        target_user=payload.username,
+        academy_id=academy_id,
+        org_id=org_id,
     )
 
     try:

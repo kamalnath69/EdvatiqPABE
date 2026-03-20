@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..utils import auth, dependencies
 from ..utils.roles import has_any_role, normalize_role
 from ..utils.default_rules import build_default_rule_entry, build_default_rules, normalize_sport
+from ..utils.workspace import log_workspace_event
 from ..db import db
 
 router = APIRouter(prefix="/rules", tags=["rules"])
@@ -86,6 +87,16 @@ async def ensure_rules_doc(student, sport: str):
     await db.users.update_one(
         {"username": username},
         {"$set": {f"sport_rules.{sport_name}": entry}},
+    )
+    await log_workspace_event(
+        current_user,
+        action="rules.updated",
+        entity_type="rule_profile",
+        entity_id=f"{username}:{sport_name}",
+        summary=f"Updated rule profile for {username} in {sport_name}.",
+        target_user=username,
+        academy_id=student.academy_id,
+        notify_users=[username],
     )
     return _entry_to_response(username, sport_name, entry)
 

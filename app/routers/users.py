@@ -7,6 +7,7 @@ from ..utils.auth import get_password_hash
 from ..utils.notifications import send_onboarding_emails
 from ..utils.roles import has_any_role, normalize_role
 from ..utils.default_rules import build_default_rule_entry, normalize_sport
+from ..utils.workspace import log_workspace_event
 from ..db import db
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -35,6 +36,15 @@ async def create_user(user: UserIn, current_user: UserInDB = Depends(dependencie
     user_dict["email_verified"] = email_verified
     user_dict["email_verified_at"] = datetime.utcnow().timestamp() if email_verified else None
     await auth.create_user(user_dict)
+    await log_workspace_event(
+        current_user,
+        action="user.created",
+        entity_type="user",
+        entity_id=user.username,
+        summary=f"Created {role} account {user.username}.",
+        target_user=user.username,
+        academy_id=user.academy_id,
+    )
     try:
         await send_onboarding_emails(user_dict)
     except Exception:
@@ -111,6 +121,15 @@ async def update_my_profile(
 
     await db.users.update_one({"username": current_user.username}, {"$set": updates})
     updated = await auth.get_user(current_user.username)
+    await log_workspace_event(
+        current_user,
+        action="profile.updated",
+        entity_type="user_profile",
+        entity_id=current_user.username,
+        summary="Updated profile information.",
+        target_user=current_user.username,
+        notify_users=[current_user.username],
+    )
     return UserOut(**updated.dict())
 
 
@@ -131,4 +150,14 @@ async def update_student_angle_measurements(
         raise HTTPException(status_code=403, detail="Cannot modify student outside academy")
 
     await db.users.update_one({"username": username}, {"$set": {"angle_measurements": payload}})
+    await log_workspace_event(
+        current_user,
+        action="student.angles.updated",
+        entity_type="user_profile",
+        entity_id=username,
+        summary=f"Updated baseline targets for {username}.",
+        target_user=username,
+        academy_id=student.academy_id,
+        notify_users=[username],
+    )
     return {"username": username, "angle_measurements": payload}

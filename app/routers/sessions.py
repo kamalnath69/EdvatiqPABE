@@ -4,6 +4,7 @@ from datetime import datetime
 from ..schemas import SessionIn
 from ..utils import dependencies, auth
 from ..utils.roles import has_any_role, normalize_role
+from ..utils.workspace import clean_doc, log_workspace_event, make_id
 from ..db import db
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -30,14 +31,30 @@ async def create_session(session: SessionIn, current_user=Depends(dependencies.g
     duration_minutes = max(1, int(round((ended_at - started_at) / 60.0)))
 
     doc = {
+        "id": make_id("session"),
         **session.dict(),
         "created_by": current_user.username,
+        "academy_id": student.academy_id,
         "started_at": started_at,
         "ended_at": ended_at,
         "duration_minutes": duration_minutes,
         "timestamp": now_ts,
+        "review_status": "unreviewed",
+        "last_reviewed_at": None,
+        "last_reviewed_by": None,
+        "attachment_refs": [],
     }
     await db.sessions.insert_one(doc)
+    await log_workspace_event(
+        current_user,
+        action="session.created",
+        entity_type="session",
+        entity_id=doc["id"],
+        summary=f"Saved {session.sport} session for {session.student}.",
+        target_user=session.student,
+        academy_id=student.academy_id,
+        notify_users=[session.student] if session.student != current_user.username else [current_user.username],
+    )
     return doc
 
 @router.get("/", response_model=List[SessionIn])
@@ -45,7 +62,7 @@ async def list_sessions(current_user=Depends(dependencies.get_current_active_use
     cursor = db.sessions.find()
     results = []
     async for r in cursor:
-        results.append(r)
+        results.append(clean_doc(r))
     return results
 
 @router.get("/{student}", response_model=List[SessionIn])
@@ -59,5 +76,5 @@ async def get_sessions(student: str, current_user=Depends(dependencies.get_curre
     cursor = db.sessions.find({"student": student})
     results = []
     async for r in cursor:
-        results.append(r)
+        results.append(clean_doc(r))
     return results

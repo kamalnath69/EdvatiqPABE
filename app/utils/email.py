@@ -4,7 +4,7 @@ import smtplib
 from email.message import EmailMessage
 
 APP_NAME = os.getenv("APP_NAME", "Edvatiq")
-APP_URL = os.getenv("APP_URL", "http://localhost:5173")
+APP_URL = os.getenv("APP_URL") or os.getenv("FRONTEND_URL") or "http://localhost:5173"
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@edvatiq.com")
 
 SMTP_HOST = os.getenv("SMTP_HOST", "")
@@ -180,6 +180,27 @@ def build_welcome_email(recipient_name: str) -> tuple[str, str, str]:
     """
     html = _email_shell(title, preheader, body_html, "Go to login", f"{APP_URL}/login")
     text = "Welcome to Edvatiq. Your workspace is ready."
+    return subject_for(title), html, text
+
+
+def build_invite_email(token: str, recipient_name: str, role: str) -> tuple[str, str, str]:
+    title = "You have been invited to Edvatiq"
+    preheader = "Accept your invitation and activate your workspace."
+    invite_url = f"{APP_URL}/signup?invite={token}"
+    body_html = f"""
+      <p style="margin:0 0 12px;color:#2b2f3a;">Hi {recipient_name},</p>
+      <p style="margin:0 0 16px;color:#2b2f3a;">
+        You've been invited to join Edvatiq as <strong>{role}</strong>. Accept the invite to access your workspace.
+      </p>
+      <p style="margin:0 0 16px;color:#5e6472;">
+        If the button does not work, open the signup page and use this invite token:
+      </p>
+      <div style="font-size:18px;letter-spacing:1px;font-weight:700;background:#f7f8fb;border:1px solid #dfe4ee;border-radius:12px;padding:14px;text-align:center;">
+        {token}
+      </div>
+    """
+    html = _email_shell(title, preheader, body_html, "Accept invite", invite_url)
+    text = f"You have been invited to Edvatiq as {role}. Use invite token {token} or visit {invite_url}."
     return subject_for(title), html, text
 
 

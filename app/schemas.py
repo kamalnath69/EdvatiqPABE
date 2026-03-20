@@ -274,6 +274,7 @@ class CoachLiveRequest(BaseModel):
 
 class CoachConfigIn(BaseModel):
     api_key: Optional[str] = None
+    key_source: Optional[str] = None
     voice_enabled: Optional[bool] = None
     live_guidance_enabled: Optional[bool] = None
     voice_style: Optional[str] = None
@@ -282,9 +283,86 @@ class CoachConfigIn(BaseModel):
 class CoachConfigOut(BaseModel):
     configured: bool
     api_key_masked: Optional[str] = None
+    key_source: str = "personal"
+    platform_key_available: bool = False
+    wallet_balance: float = 0
+    wallet_currency: str = "credits"
+    credit_rate_per_1k_tokens: float = 1
+    inr_per_credit: float = 1
+    suggested_top_up: float = 100
     voice_enabled: bool = True
     live_guidance_enabled: bool = True
     voice_style: str = "calm"
+
+
+class WalletTopUpIn(BaseModel):
+    credits: float = Field(default=100, gt=0)
+    amount_inr: Optional[float] = Field(default=None, gt=0)
+    note: Optional[str] = None
+
+
+class WalletRechargeInitIn(BaseModel):
+    credits: float = Field(default=100, gt=0)
+    amount_inr: Optional[float] = Field(default=None, gt=0)
+    note: Optional[str] = None
+
+
+class WalletRechargeOrderOut(BaseModel):
+    order_id: str
+    amount: int
+    currency: str
+    key_id: str
+    credits: float
+    amount_inr: float
+
+
+class WalletRechargeVerifyIn(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+class WalletTransactionOut(BaseModel):
+    id: str
+    username: str
+    type: str
+    credits: float
+    balance_after: float
+    amount_inr: Optional[float] = None
+    tokens_used: Optional[int] = None
+    source: Optional[str] = None
+    model: Optional[str] = None
+    note: Optional[str] = None
+    created_at: float
+
+
+class WalletSummaryOut(BaseModel):
+    username: str
+    balance: float = 0
+    currency: str = "credits"
+    preferred_key_source: str = "personal"
+    personal_key_configured: bool = False
+    platform_key_available: bool = False
+    default_credit_rate_per_1k_tokens: float = 1
+    inr_per_credit: float = 1
+    suggested_top_up: float = 100
+    updated_at: Optional[float] = None
+
+
+class AiPlatformSettingsIn(BaseModel):
+    default_api_key: Optional[str] = None
+    credit_rate_per_1k_tokens: Optional[float] = Field(default=None, gt=0)
+    inr_per_credit: Optional[float] = Field(default=None, gt=0)
+    suggested_top_up: Optional[float] = Field(default=None, gt=0)
+
+
+class AiPlatformSettingsOut(BaseModel):
+    default_api_key_masked: Optional[str] = None
+    platform_key_available: bool = False
+    credit_rate_per_1k_tokens: float = 1
+    inr_per_credit: float = 1
+    suggested_top_up: float = 100
+    api_key_source: Optional[str] = None
 
 
 class UserSettingsIn(BaseModel):
@@ -525,3 +603,19 @@ class SystemStatusOut(BaseModel):
     ai_configured: bool
     enabled_features: List[str]
     collection_counts: Dict[str, int]
+
+
+class HelpArticleIn(BaseModel):
+    title: str
+    body: str
+    category: Optional[str] = "general"
+    audience: Optional[str] = "all"
+    order: Optional[int] = 0
+    published: Optional[bool] = True
+
+
+class HelpArticleOut(HelpArticleIn):
+    id: str
+    created_by: Optional[str] = None
+    created_at: float
+    updated_at: float
