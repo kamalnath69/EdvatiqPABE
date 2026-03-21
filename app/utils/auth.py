@@ -27,6 +27,20 @@ def _normalize_password(secret: str) -> str:
     return f"{LONG_PASSWORD_PREFIX}{hashlib.sha256(raw).hexdigest()}"
 
 
+def validate_password_strength(password: str) -> None:
+    secret = password or ""
+    if len(secret) < 8:
+        raise ValueError("Password must be at least 8 characters long.")
+    if not any(char.islower() for char in secret):
+        raise ValueError("Password must include at least one lowercase letter.")
+    if not any(char.isupper() for char in secret):
+        raise ValueError("Password must include at least one uppercase letter.")
+    if not any(char.isdigit() for char in secret):
+        raise ValueError("Password must include at least one number.")
+    if not any(not char.isalnum() for char in secret):
+        raise ValueError("Password must include at least one symbol.")
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     normalized = _normalize_password(plain_password).encode("utf-8")
     try:
@@ -36,6 +50,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_password_hash(password: str) -> str:
+    validate_password_strength(password)
     normalized = _normalize_password(password).encode("utf-8")
     return bcrypt.hashpw(normalized, bcrypt.gensalt()).decode("utf-8")
 

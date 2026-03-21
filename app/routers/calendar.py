@@ -37,9 +37,15 @@ async def list_events(current_user=Depends(dependencies.get_current_active_user)
 
 @router.post("/", response_model=CalendarEventOut)
 async def create_event(payload: CalendarEventIn, current_user=Depends(dependencies.get_current_active_user)):
+    role = normalize_role(current_user.role)
     academy_id = current_user.academy_id
-    if payload.student:
-        student = await require_student_access(payload.student, current_user)
+    target_student = payload.student
+    if role == "student" and payload.student and payload.student != current_user.username:
+        raise HTTPException(status_code=403, detail="Students can only create calendar items for themselves")
+    if role == "student" and not target_student:
+        target_student = current_user.username
+    if target_student:
+        student = await require_student_access(target_student, current_user)
         academy_id = student.get("academy_id")
     elif not has_any_role(current_user.role, ["admin", "academy_admin", "academyAdmin", "staff"]):
         academy_id = current_user.academy_id
@@ -47,20 +53,22 @@ async def create_event(payload: CalendarEventIn, current_user=Depends(dependenci
     doc = {
         "id": make_id("cal"),
         **payload.dict(),
+        "student": target_student,
+        "attendees": payload.attendees or ([current_user.username] if role == "student" else []),
         "owner": current_user.username,
         "academy_id": academy_id,
         "created_at": now,
         "updated_at": now,
     }
     await db.calendar_events.insert_one(doc)
-    notify = [payload.student] if payload.student else list(set((payload.attendees or []) + [current_user.username]))
+    notify = [target_student] if target_student else list(set((doc.get("attendees") or []) + [current_user.username]))
     await log_workspace_event(
         current_user,
         action="calendar.created",
         entity_type="calendar",
         entity_id=doc["id"],
         summary=f"Scheduled {payload.title}.",
-        target_user=payload.student,
+        target_user=target_student,
         academy_id=academy_id,
         notify_users=notify,
     )

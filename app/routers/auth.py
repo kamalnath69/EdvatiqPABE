@@ -14,6 +14,7 @@ from ..schemas import (
     ResetPasswordIn,
     SignupEmailRequest,
     SignupEmailVerify,
+    SignupAvailabilityOut,
 )
 from ..utils.auth import create_access_token, get_password_hash
 from ..utils.email import build_password_reset_email, build_signup_verification_email, send_email
@@ -172,6 +173,9 @@ async def request_signup_verification(payload: SignupEmailRequest):
     email = (payload.email or "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email is required.")
+    existing_user = await db.users.find_one({"email": email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email is already registered.")
     if await is_signup_email_verified(email):
         return {"detail": "Email already verified for checkout."}
     code = await create_signup_verification(email)
@@ -192,3 +196,19 @@ async def verify_signup_email(payload: SignupEmailVerify):
     if not verified:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
     return {"detail": "Email verified for checkout."}
+
+
+@router.get("/signup-availability", response_model=SignupAvailabilityOut)
+async def signup_availability(username: str = "", email: str = ""):
+    normalized_username = (username or "").strip()
+    normalized_email = (email or "").strip().lower()
+    username_available = True
+    email_available = True
+    if normalized_username:
+      username_available = await db.users.find_one({"username": normalized_username}) is None
+    if normalized_email:
+      email_available = await db.users.find_one({"email": normalized_email}) is None
+    return SignupAvailabilityOut(
+        username_available=username_available,
+        email_available=email_available,
+    )

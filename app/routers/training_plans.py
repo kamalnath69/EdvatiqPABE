@@ -32,13 +32,18 @@ async def list_training_plans(current_user=Depends(dependencies.get_current_acti
 
 @router.post("/", response_model=TrainingPlanOut)
 async def create_training_plan(payload: TrainingPlanIn, current_user=Depends(dependencies.get_current_active_user)):
-    if not has_any_role(current_user.role, ["admin", "academy_admin", "academyAdmin", "staff"]):
+    role = normalize_role(current_user.role)
+    if not has_any_role(current_user.role, ["admin", "academy_admin", "academyAdmin", "staff", "student"]):
         raise HTTPException(status_code=403, detail="Insufficient privileges")
-    student = await require_student_access(payload.student, current_user)
+    target_student = payload.student or current_user.username
+    if role == "student" and target_student != current_user.username:
+        raise HTTPException(status_code=403, detail="Students can only create their own training plans")
+    student = await require_student_access(target_student, current_user)
     now = datetime.utcnow().timestamp()
     doc = {
         "id": make_id("plan"),
         **payload.dict(),
+        "student": target_student,
         "owner": current_user.username,
         "academy_id": student.get("academy_id"),
         "created_at": now,
@@ -51,9 +56,9 @@ async def create_training_plan(payload: TrainingPlanIn, current_user=Depends(dep
         entity_type="training_plan",
         entity_id=doc["id"],
         summary=f"Assigned training plan {payload.title}.",
-        target_user=payload.student,
+        target_user=target_student,
         academy_id=student.get("academy_id"),
-        notify_users=[payload.student],
+        notify_users=[target_student],
     )
     return doc
 

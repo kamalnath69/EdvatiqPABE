@@ -13,6 +13,7 @@ from .routers import (
     coach_reviews as coach_reviews_router,
     favorites as favorites_router,
     help_docs as help_docs_router,
+    hardware as hardware_router,
     invites as invites_router,
     leads as leads_router,
     notifications as notifications_router,
@@ -71,6 +72,7 @@ app.include_router(coach_reviews_router.router)
 app.include_router(calendar_router.router)
 app.include_router(audit_router.router)
 app.include_router(help_docs_router.router)
+app.include_router(hardware_router.router)
 app.include_router(invites_router.router)
 app.include_router(favorites_router.router)
 app.include_router(attachments_router.router)

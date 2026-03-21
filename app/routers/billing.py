@@ -190,12 +190,17 @@ async def create_order(payload: CheckoutInitIn):
         raise HTTPException(status_code=400, detail="Organization name is required for organization plans.")
     if not payload.email:
         raise HTTPException(status_code=400, detail="Email is required for plan activation.")
+    if not payload.accepted_terms:
+        raise HTTPException(status_code=400, detail="You must accept the terms and conditions.")
     if EMAIL_VERIFICATION_REQUIRED and not await is_signup_email_verified(payload.email):
         raise HTTPException(status_code=403, detail="Email verification required before checkout.")
 
     existing_user = await db.users.find_one({"username": payload.username})
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered.")
+    existing_email = await db.users.find_one({"email": payload.email})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered.")
 
     client = _get_razorpay_client()
     order = client.order.create(
@@ -228,6 +233,8 @@ async def verify_payment(payload: CheckoutVerifyIn):
         raise HTTPException(status_code=400, detail="Organization name is required for organization plans.")
     if not payload.email:
         raise HTTPException(status_code=400, detail="Email is required for plan activation.")
+    if not payload.accepted_terms:
+        raise HTTPException(status_code=400, detail="You must accept the terms and conditions.")
     signup_email_verified = True
     if EMAIL_VERIFICATION_REQUIRED:
         signup_email_verified = await is_signup_email_verified(payload.email)
@@ -237,6 +244,9 @@ async def verify_payment(payload: CheckoutVerifyIn):
     existing_user = await db.users.find_one({"username": payload.username})
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered.")
+    existing_email = await db.users.find_one({"email": payload.email})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered.")
 
     client = _get_razorpay_client()
     try:
@@ -293,6 +303,9 @@ async def verify_payment(payload: CheckoutVerifyIn):
         "org_id": org_id,
         "full_name": payload.full_name,
         "email": payload.email,
+        "dob": payload.dob,
+        "accepted_terms": bool(payload.accepted_terms),
+        "accepted_terms_at": datetime.utcnow().timestamp() if payload.accepted_terms else None,
         "email_verified": email_verified,
         "email_verified_at": datetime.utcnow().timestamp() if email_verified else None,
         "plan_code": plan.code,

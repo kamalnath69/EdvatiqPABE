@@ -26,6 +26,9 @@ class UserIn(BaseModel):
     org_id: Optional[str] = None
     full_name: Optional[str] = None
     email: Optional[str] = None
+    dob: Optional[str] = None
+    accepted_terms: Optional[bool] = None
+    accepted_terms_at: Optional[float] = None
     plan_code: Optional[str] = None
     plan_type: Optional[str] = None
     plan_tier: Optional[str] = None
@@ -59,6 +62,8 @@ class UserOut(BaseModel):
     full_name: Optional[str] = None
     dob: Optional[str] = None
     email: Optional[str] = None
+    accepted_terms: Optional[bool] = None
+    accepted_terms_at: Optional[float] = None
     phone: Optional[str] = None
     gender: Optional[str] = None
     address: Optional[str] = None
@@ -121,8 +126,75 @@ class SessionIn(BaseModel):
     best_rep: Optional[dict] = None
     best_frame: Optional[dict] = None
     camera_summary: Optional[dict] = None
+    sensor_summary: Optional[dict] = None
     movement_summary: Optional[dict] = None
     timeline_summary: Optional[dict] = None
+
+
+class HardwareTelemetryIn(BaseModel):
+    student: Optional[str] = None
+    sport: Optional[str] = None
+    source: Optional[str] = "hardware"
+    device_id: Optional[str] = None
+    temperature_c: Optional[float] = None
+    pressure_kpa: Optional[float] = None
+    humidity_pct: Optional[float] = None
+    battery_pct: Optional[float] = None
+    captured_at: Optional[float] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class HardwareTelemetryOut(HardwareTelemetryIn):
+    id: str
+    owner: str
+    academy_id: Optional[str] = None
+    updated_at: float
+
+
+class HardwareDeviceIn(BaseModel):
+    name: str
+    student: Optional[str] = None
+    device_type: Optional[str] = "esp32-bme280"
+    transport: Optional[str] = "wifi-http"
+    sampling_interval_ms: Optional[int] = 500
+    firmware_version: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class HardwareDeviceUpdate(BaseModel):
+    name: Optional[str] = None
+    student: Optional[str] = None
+    active: Optional[bool] = None
+    sampling_interval_ms: Optional[int] = None
+    firmware_version: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class HardwareDeviceOut(BaseModel):
+    id: str
+    name: str
+    student: Optional[str] = None
+    device_type: str = "esp32-bme280"
+    transport: str = "wifi-http"
+    sampling_interval_ms: int = 500
+    firmware_version: Optional[str] = None
+    notes: Optional[str] = None
+    active: bool = True
+    academy_id: Optional[str] = None
+    owner: str
+    created_at: float
+    updated_at: float
+    last_seen_at: Optional[float] = None
+    last_telemetry_at: Optional[float] = None
+    latest_temperature_c: Optional[float] = None
+    latest_pressure_kpa: Optional[float] = None
+    latest_humidity_pct: Optional[float] = None
+    latest_battery_pct: Optional[float] = None
+    token_preview: Optional[str] = None
+
+
+class HardwareDeviceProvisionOut(HardwareDeviceOut):
+    device_token: str
 
 # billing + plans
 class PlanInfo(BaseModel):
@@ -152,6 +224,8 @@ class CheckoutInitIn(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = None
     org_name: Optional[str] = None
+    dob: Optional[str] = None
+    accepted_terms: bool = False
 
 
 class CheckoutVerifyIn(BaseModel):
@@ -161,6 +235,8 @@ class CheckoutVerifyIn(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = None
     org_name: Optional[str] = None
+    dob: Optional[str] = None
+    accepted_terms: bool = False
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
@@ -192,6 +268,11 @@ class SignupEmailRequest(BaseModel):
 class SignupEmailVerify(BaseModel):
     email: str
     code: str
+
+
+class SignupAvailabilityOut(BaseModel):
+    username_available: bool = True
+    email_available: bool = True
 
 # leads
 class DemoLeadIn(BaseModel):
@@ -270,6 +351,8 @@ class CoachLiveRequest(BaseModel):
     tracking_quality: Optional[str] = Field(default=None, alias="trackingQuality")
     drill_focus: Optional[str] = Field(default=None, alias="drillFocus")
     custom_note: Optional[str] = Field(default=None, alias="customNote")
+    temperature_c: Optional[float] = Field(default=None, alias="temperatureC")
+    pressure_kpa: Optional[float] = Field(default=None, alias="pressureKpa")
 
 
 class CoachConfigIn(BaseModel):
@@ -432,7 +515,7 @@ class ReportOut(ReportIn):
 
 class TrainingPlanIn(BaseModel):
     title: str
-    student: str
+    student: Optional[str] = None
     sport: Optional[str] = None
     summary: Optional[str] = None
     weekly_focus: Optional[List[str]] = None

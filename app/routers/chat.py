@@ -155,6 +155,8 @@ def _coerce_live_payload(raw_payload: dict | None, current_user: UserInDB) -> Co
         "tracking_quality": raw.get("tracking_quality", raw.get("trackingQuality")),
         "drill_focus": raw.get("drill_focus", raw.get("drillFocus")),
         "custom_note": raw.get("custom_note", raw.get("customNote")),
+        "temperature_c": raw.get("temperature_c", raw.get("temperatureC")),
+        "pressure_kpa": raw.get("pressure_kpa", raw.get("pressureKpa")),
     }
     try:
         return CoachLiveRequest.model_validate(payload)
@@ -339,6 +341,8 @@ async def live_guidance(
         f"Phase: {payload.phase or 'unknown'}\n"
         f"Rep count: {payload.rep_count if payload.rep_count is not None else 'unknown'}\n"
         f"Tracking quality: {payload.tracking_quality or 'unknown'}\n"
+        f"Temperature (C): {payload.temperature_c if payload.temperature_c is not None else 'unknown'}\n"
+        f"Pressure (kPa): {payload.pressure_kpa if payload.pressure_kpa is not None else 'unknown'}\n"
         f"Drill focus: {payload.drill_focus or 'none'}\n"
         f"Coach note: {payload.custom_note or 'none'}\n"
         f"Active feedback: {feedback_blob}\n"
